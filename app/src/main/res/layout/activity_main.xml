@@ -13,6 +13,12 @@
 		android:layout_height="wrap_content"
 		android:background="@android:color/darker_gray"
 		android:orientation="vertical">
+		<Button
+			android:id="@+id/button"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:text="write"/>
+
 		<CheckBox
 			android:id="@+id/cb_read_tech_list"
 			android:layout_width="match_parent"
@@ -24,6 +30,12 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:text="READ DATA"/>
+
+		<CheckBox
+			android:id="@+id/cb_read_ndef"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:text="READ NDEF"/>
 	</LinearLayout>
 
 	<ListView
