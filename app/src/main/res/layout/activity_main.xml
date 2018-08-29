@@ -13,11 +13,27 @@
 		android:layout_height="wrap_content"
 		android:background="@android:color/darker_gray"
 		android:orientation="vertical">
-		<Button
-			android:id="@+id/button"
+
+		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:text="write"/>
+			android:orientation="horizontal">
+
+			<EditText
+				android:id="@+id/et_write_ndef_text"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:ems="10"
+				android:inputType="textMultiLine"/>
+
+			<Button
+				android:id="@+id/btn_write_ndef_text"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_weight="1.5"
+				android:text="write ndef text"/>
+		</LinearLayout>
 
 		<CheckBox
 			android:id="@+id/cb_read_tech_list"

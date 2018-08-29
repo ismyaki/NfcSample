@@ -4,15 +4,16 @@ import android.Manifest;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.nfc.FormatException;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
+import android.nfc.tech.IsoDep;
 import android.nfc.tech.MifareClassic;
 import android.nfc.tech.MifareUltralight;
 import android.nfc.tech.Ndef;
+import android.nfc.tech.NfcA;
 import android.os.Build;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
@@ -23,11 +24,14 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ListView;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -89,12 +93,27 @@ public class MainActivity extends AppCompatActivity {
 		}
 	}
 	
+	private EditText et_write_ndef_text;
+	private Button btn_write_ndef_text;
 	private CheckBox cb_read_tech_list;
 	private CheckBox cb_read_data;
 	private CheckBox cb_read_ndef;
 	private ListView lv;
 	private ArrayAdapter arrayAdapter;
 	private void initView(){
+		et_write_ndef_text = findViewById(R.id.et_write_ndef_text);
+		btn_write_ndef_text = findViewById(R.id.btn_write_ndef_text);
+		btn_write_ndef_text.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				String str = et_write_ndef_text.getText().toString().trim();
+				if (str.length() > 0){
+					writeNdefText(et_write_ndef_text.getText().toString().trim());
+					et_write_ndef_text.setText("");
+				}
+			}
+		});
+		
 		cb_read_tech_list = findViewById(R.id.cb_read_tech_list);
 		
 		cb_read_data = findViewById(R.id.cb_read_data);
@@ -107,13 +126,6 @@ public class MainActivity extends AppCompatActivity {
 				R.layout.list_item,
 				new ArrayList<String>());
 		lv.setAdapter(arrayAdapter);
-		
-		findViewById(R.id.button).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-//				write("123" , myTag);
-			}
-		});
 	}
 	
 	private void setText(final String txt){
@@ -213,50 +225,6 @@ public class MainActivity extends AppCompatActivity {
 		}
 	}
 	
-	private void write(String text, Tag tag) {
-		//TODO 未完成
-		NdefRecord[] records = { createRecord(text) };
-		NdefMessage message = new NdefMessage(records);
-		// Get an instance of Ndef for the tag.
-		Ndef ndef = Ndef.get(tag);
-		try {
-			// Enable I/O
-			ndef.connect();
-			// Write the message
-			ndef.writeNdefMessage(message);
-			// Close the connection
-			ndef.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (FormatException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	private NdefRecord createRecord(String text){
-		//TODO 未完成
-		NdefRecord recordNFC = null;
-		try {
-			byte[] textBytes  = text.getBytes();
-			byte[] langBytes  = Locale.getDefault().getLanguage().getBytes("UTF-8");
-			int langLength = langBytes.length;
-			int textLength = textBytes.length;
-			byte[] payload = new byte[1 + langLength + textLength];
-			
-			// set status byte (see NDEF spec for actual bits)
-			payload[0] = (byte) langLength;
-			
-			// copy langbytes and textbytes into payload
-			System.arraycopy(langBytes, 0, payload, 1,              langLength);
-			System.arraycopy(textBytes, 0, payload, 1 + langLength, textLength);
-			
-			recordNFC = new NdefRecord(NdefRecord.TNF_WELL_KNOWN,  NdefRecord.RTD_TEXT,  new byte[0], payload);
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}
-		return recordNFC;
-	}
-	
 	private String ByteArrayToHexString(byte[] inarray) {
 		int i, j, in;
 		String[] hex = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F" };
@@ -295,6 +263,14 @@ public class MainActivity extends AppCompatActivity {
 		//TODO 取出TAG ID
 		setText("TAG ID : " + ByteArrayToHexString(intent.getByteArrayExtra(NfcAdapter.EXTRA_ID)));
 		myTag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+		if (writeNdefMessage != null){
+			//TODO 寫入 NDEF
+			Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+			writeNdefTag(tag , writeNdefMessage);
+			writeNdefMessage = null;
+			writeNdefText = null;
+			return;
+		}
 		//TODO 取出intent中的TAG
 		if (cb_read_tech_list.isChecked() == true){
 			readTechList(intent);
@@ -311,16 +287,26 @@ public class MainActivity extends AppCompatActivity {
 			if (mfc != null){
 				readMifareClassic(mfc);
 			}
+			
+			IsoDep isoDep = IsoDep.get(tagFromIntent);
+			if (isoDep != null){
+//				readIsoDep(isoDep);
+			}
+			
+			NfcA nfcA = NfcA.get(tagFromIntent);
+			if (nfcA != null){
+			
+			}
 		}
 		//TODO 取出 NDEF 資料
 		if (cb_read_ndef.isChecked() == true){
-			readNDEF2(intent);
+			readNdef(intent);
 		}
 		setText("-------READ END-------");
 	}
 	
 	/** 解析NDEF */
-	public List<String> readNDEF2(Intent intent) {
+	public List<String> readNdef(Intent intent) {
 		if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction())) {
 			//取得 NdefMessage
 			NdefMessage[] msgs = null;
@@ -407,73 +393,6 @@ public class MainActivity extends AppCompatActivity {
 		return null;
 	}
 	
-	/** 解析NFC信息 */
-	public List<String> readNDEF(Intent intent) {
-		if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction())) {
-			NdefMessage[] msgs = getTagNdefMessage(intent);
-			List<String> ndefList = getNdefString(msgs);
-			
-			if (ndefList != null && ndefList.size() != 0) {
-				for (String s : ndefList) {
-					setText(s);
-				}
-				return ndefList;
-			}
-		}
-		return null;
-	}
-	
-	/** 得到Intent中的NDEF数据 */
-	private NdefMessage[] getTagNdefMessage(Intent intent) {
-		NdefMessage[] msgs = null;
-		Parcelable[] rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
-		
-		//把序列化数据转成Messaeg对象
-		if (rawMsgs != null) {
-			msgs = new NdefMessage[rawMsgs.length];
-			for (int i = 0; i < rawMsgs.length; i++) {
-				msgs[i] = (NdefMessage) rawMsgs[i];
-			}
-		} else {
-			// Unknown tag type
-			byte[] empty = new byte[]{};
-			NdefRecord record = new NdefRecord(NdefRecord.TNF_UNKNOWN, empty, empty, empty);
-			NdefMessage msg = new NdefMessage(new NdefRecord[]{record});
-			msgs = new NdefMessage[]{msg};
-		}
-		return msgs;
-	}
-	
-	/** 把Message转成List */
-	private List<String> getNdefString(NdefMessage[] msgs) {
-		List<String> list = new ArrayList<>();
-		if (msgs != null && msgs.length != 0) {
-			for (NdefMessage ndefMessage : msgs) {
-				list.addAll(parser(ndefMessage));
-			}
-			return list;
-		}
-		return null;
-	}
-	
-	/** 把NDEF中的信息系转化为Record，并最终转化为String */
-	private List<String> parser(NdefMessage ndefMessage) {
-		NdefRecord[] records = ndefMessage.getRecords();
-		List<String> elements = new ArrayList<>();
-		int count = 0;
-		for (NdefRecord ndefRecord : records) {
-			String str = parseString(ndefRecord);
-			if (str != null){
-				elements.add(str);
-			}
-			
-			byte[] payload = ndefRecord.getPayload();
-			count += payload.length;
-		}
-		setText("payload count " + count);
-		return elements;
-	}
-	
 	/**
 	 * 吧Ndef记录转为String，这里的格式是TNF_WELL_KNOWN with RTD_TEXT
 	 * @param ndefRecord
@@ -497,11 +416,124 @@ public class MainActivity extends AppCompatActivity {
 		}
 	}
 	
+	private NdefMessage writeNdefMessage;
+	private String writeNdefText;
+	private void writeNdefText(String text){
+		NdefRecord record;
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
+			record = NdefRecord.createTextRecord(Locale.getDefault().getLanguage(), text);
+		} else{
+			record = createTextRecord(text);
+		}
+		writeNdefMessage = new NdefMessage(new NdefRecord[]{record});
+		writeNdefText = text;
+		setText("寫入資料就緒 請再次讀卡 : " + writeNdefText);
+	}
+	
+	private boolean writeNdefTag(Tag tag , NdefMessage ndefMessage){
+		try {
+			// 获取Ndef
+			Ndef ndef = Ndef.get(tag);
+			// 连接
+			ndef.connect();
+			// 写入数据
+			ndef.writeNdefMessage(ndefMessage);
+			setText("寫入成功 : " + writeNdefText);
+			return true;
+		} catch (FormatException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		setText("寫入失敗 : " + writeNdefText);
+		return false;
+	}
+	
+	/**
+	 * 创建文本信息
+	 * @param text 要写入的文本信息
+	 */
+	private NdefRecord createTextRecord(String text) {
+		NdefRecord ndefRecord;
+		// 设置语言
+		byte[] langBytes = Locale.getDefault().getLanguage().getBytes(Charset.forName("UTF-8"));
+		// 设置编码
+		Charset utfEncoding = Charset.forName("UTF-8");
+		// 要写入的二进制数据
+		byte[] textBytes = text.getBytes(utfEncoding);
+		int utfBit = 0;
+		// 将语言长度转化对应的字符
+		char status = (char)(utfBit + langBytes.length);
+		// 创建一个大小为 1(即语言长度转化对应的字符) + 语言字节长度 + 文本字节长度的字节数组
+		byte[] data = new byte[1 + langBytes.length + textBytes.length];
+		// 写入第一位数据
+		data[0] = (byte) status;
+		// 写入语言字节
+		System.arraycopy(langBytes, 0, data, 1, langBytes.length);
+		// 写入文本数据
+		System.arraycopy(textBytes, 0, data, langBytes.length + 1, textBytes.length);
+		// 创建一个NdefRecord记录
+		ndefRecord = new NdefRecord(NdefRecord.TNF_WELL_KNOWN, NdefRecord.RTD_TEXT, new byte[0], data);
+		return ndefRecord;
+	}
+	
 	/**讀取 TechList*/
 	private void readTechList(Intent intent){
 		Tag tagFromIntent = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
 		for (String tech : tagFromIntent.getTechList()) {
 			setText(tech);
+		}
+	}
+	
+	/**讀取 Data*/
+	private void readIsoDep(IsoDep isoDep){
+		//TODO 寫入指令 還沒完成
+		try {
+			if (isoDep.isConnected() == false) {
+				isoDep.connect();
+			} else {
+				isoDep.close();
+				isoDep.connect();
+			}
+			setText("讀取資料 IsoDep");
+			
+			byte[] cmd = {};
+			
+//			cmd = new byte[]{
+//					(byte) 0x00, // CLA Class
+//					(byte) 0xA4, // INS Instruction
+//					(byte) 0x04, // P1  Parameter 1
+//					(byte) 0x00, // P2  Parameter 2
+//					(byte) 0x0A, // Length
+//					0x63,0x64,0x63,0x00,0x00,0x00,0x00,0x32,0x32,0x31 // AID
+//			};
+			
+			cmd = new byte[]{
+					(byte) 0x01,
+					(byte) 0x00,(byte) 0x00,(byte) 0x00,(byte) 0x00,(byte) 0x00,
+					(byte) 0x00,(byte) 0x00,(byte) 0x00,(byte) 0x00,(byte) 0x00,
+					(byte) 0x00,(byte) 0x00,(byte) 0x00,(byte) 0x00,(byte) 0x00,
+					(byte) 0x00,
+			};
+			
+			cmd = new byte[]{
+					(byte) 0x03,(byte) 0xA8,
+			};
+			
+			setText("cmd : " + bytesToHexString(cmd));
+			byte[] transceive = isoDep.transceive(cmd);
+			setText("transceive : " + bytesToHexString(transceive));
+		} catch (IOException e) {
+			setText(e.getMessage());
+			e.printStackTrace();
+		}
+		if (isoDep.isConnected()) {
+			try {
+				isoDep.close();
+			} catch (IOException e) {
+				setText(e.getMessage());
+				e.printStackTrace();
+			}
 		}
 	}
 	
